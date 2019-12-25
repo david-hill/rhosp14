@@ -1,10 +1,11 @@
 resource_registry:
 #  OS::TripleO::BlockStorage::Net::SoftwareConfig: /home/stack/rhosp14/my-overcloud/network/config/single-nic-vlans/cinder-storage.yaml
-  OS::TripleO::Compute::Net::SoftwareConfig: /home/stack/rhosp14/my-overcloud/network/config/single-nic-vlans/compute.yaml
-  OS::TripleO::Controller::Net::SoftwareConfig: /home/stack/rhosp14/my-overcloud/network/config/single-nic-vlans/controller.yaml
+  OS::TripleO::Compute::Net::SoftwareConfig: /home/stack/rhosp14/my-overcloud/network/config/single-nic-vlans/controller-custom.yaml
+  OS::TripleO::Controller::Net::SoftwareConfig: /home/stack/rhosp14/my-overcloud/network/config/single-nic-vlans/controller-custom.yaml
 #  OS::TripleO::ObjectStorage::Net::SoftwareConfig: /home/stack/rhosp14/my-overcloud/network/config/single-nic-vlans/swift-storage.yaml
   OS::TripleO::CephStorage::Net::SoftwareConfig: /home/stack/rhosp14/my-overcloud/network/config/single-nic-vlans/ceph-storage.yaml
   OS::TripleO::NodeUserData: /home/stack/rhosp14/my-overcloud/swap.yaml
+  OS::TripleO::Compute::Ports::ExternalPort: /home/stack/rhosp14/my-overcloud/network/ports/external.yaml
 parameter_defaults:
   # Customize all these values to match the local environment
   InternalApiNetCidr: 172.17.0.0/24
@@ -12,6 +13,7 @@ parameter_defaults:
   StorageMgmtNetCidr: 172.19.0.0/24
   TenantNetCidr: 172.16.0.0/24
   ExternalNetCidr: 192.168.122.0/24
+  NetworkDeploymentActions: ['CREATE','UPDATE']
   InternalApiAllocationPools: [{'start': '172.17.0.10', 'end': '172.17.0.200'}]
   StorageAllocationPools: [{'start': '172.18.0.10', 'end': '172.18.0.200'}]
   StorageMgmtAllocationPools: [{'start': '172.19.0.10', 'end': '172.19.0.200'}]

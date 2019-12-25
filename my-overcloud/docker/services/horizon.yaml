@@ -147,7 +147,7 @@ outputs:
               - KOLLA_CONFIG_STRATEGY=COPY_ALWAYS
               # Installed plugins:
               - ENABLE_IRONIC=yes
-              - ENABLE_MANILA=yes
+              - ENABLE_MANILA=no
               - ENABLE_HEAT=yes
               - ENABLE_MISTRAL=yes
               - ENABLE_OCTAVIA=yes

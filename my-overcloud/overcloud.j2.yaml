@@ -396,6 +396,16 @@ resources:
             - {get_attr: [{{role.name}}, known_hosts_hostnames]}
             {% endfor %}
 
+  # Creates the "heat-admin" user if configured via the environment
+  # Should return a OS::Heat::MultipartMime reference via OS::stack_id
+  NodeAdminUserData:
+    type: OS::TripleO::NodeAdminUserData
+
+  # For optional operator additional userdata
+  # Should return a OS::Heat::MultipartMime reference via OS::stack_id
+  NodeUserData:
+    type: OS::TripleO::NodeUserData
+
   # Jinja loop for Role in roles_data.yaml
 {% for role in roles %}
   # Resources generated for {{role.name}} Role
@@ -523,7 +533,7 @@ resources:
     depends_on: {{role.name}}AllNodesDeployment
     properties:
       name: {{role.name}}AllNodesValidationDeployment
-      config: {get_resource: AllNodesValidationConfig}
+      config: {get_resource: {{role.name}}AllNodesValidationConfig}
       servers: {get_attr: [{{role.name}}Servers, value]}
 
   {{role.name}}IpListMap:
@@ -531,7 +541,7 @@ resources:
     properties:
       ControlPlaneIpList: {get_attr: [{{role.name}}, ip_address]}
 {%- for network in networks %}
-  {%- if network.enabled|default(true) %}
+  {%- if network.enabled|default(true) and network.name in role.networks|default([]) %}
       {{network.name}}IpList: {get_attr: [{{role.name}}, {{network.name_lower}}_ip_address]}
   {%- else %}
       {{network.name}}IpList: {get_attr: [{{role.name}}, ip_address]}
@@ -555,6 +565,23 @@ resources:
           expression: dict($.data.where($ != null).flatten().selectMany($.items()).groupBy($[0], $[1]).select([$[0], $[1].flatten()]))
           data:
             - {get_attr: [{{role.name}}, hostname_map]}
+
+  # Combine the NodeAdminUserData and NodeUserData mime archives
+  {{role.name}}UserData:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+      - config: {get_resource: NodeAdminUserData}
+        type: multipart
+      - config: {get_resource: NodeUserData}
+        type: multipart
+      - config: {get_resource: {{role.name}}RoleUserData}
+        type: multipart
+
+  # For optional operator role-specific userdata
+  # Should return a OS::Heat::MultipartMime reference via OS::stack_id
+  {{role.name}}RoleUserData:
+    type: OS::TripleO::{{role.name}}::NodeUserData
 
   {{role.name}}:
     type: OS::Heat::ResourceGroup
@@ -596,6 +623,7 @@ resources:
             map_merge:
               - {{role.RoleParametersDefault|default({})}}
               - get_param: {{role.name}}Parameters
+          UserData: {get_resource: {{role.name}}UserData}
 {% endfor %}
 
 {% for role in roles %}
@@ -853,18 +881,22 @@ resources:
     # ServiceNetMap's attribute values are available.
     depends_on: ServiceNetMap
 
+{%- for role in roles %}
   # All Nodes Validations
-  AllNodesValidationConfig:
+  {{role.name}}AllNodesValidationConfig:
     type: OS::TripleO::AllNodes::Validation
     properties:
       PingTestIps:
         list_join:
         - ' '
         -
-{%- for network in networks if network.enabled|default(true) %}
+{%- for network in networks %}
+  {%- if network.enabled|default(true) and network.name in role.networks|default([]) %}
           - yaql:
               expression: coalesce($.data, []).first(null)
-              data: {get_attr: [{{primary_role_name}}, {{network.name_lower}}_ip_address]}
+              data: {get_attr: [{{role.name}}, {{network.name_lower}}_ip_address]}
+  {%- endif %}
+{%- endfor %}
 {%- endfor %}
 
   # Optional ExtraConfig for all nodes - all roles are passed in here, but

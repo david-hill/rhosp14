@@ -7,6 +7,10 @@ parameters:
   DockerMistralExecutorImage:
     description: image
     type: string
+  DockerMistralExecutorUlimit:
+    default: ['nofile=1024']
+    description: ulimit for Mistral Executor Container
+    type: comma_delimited_list
   DockerMistralConfigImage:
     description: The container image to use for the mistral config_volume
     type: string
@@ -122,11 +126,19 @@ outputs:
         step_4:
           mistral_executor:
             image: {get_param: DockerMistralExecutorImage}
+            ulimit: {get_param: DockerMistralExecutorUlimit}
             net: host
             privileged: false
             restart: always
             healthcheck:
-              test: /openstack/healthcheck
+              test:
+                list_join:
+                  - ' '
+                  - - '/openstack/healthcheck'
+                    - yaql:
+                        expression: str($.data.port)
+                        data:
+                          port: {get_attr: [MistralBase, role_data, config_settings, 'mistral::rabbit_port']}
             volumes:
               list_concat:
                 - {get_attr: [ContainersCommon, volumes]}

@@ -51,22 +51,6 @@ parameters:
     description: Nova flavor ID to be used when creating the nova flavor for
                  amphora.
     type: number
-  OctaviaTimeoutClientData:
-    default: 50000
-    description: Frontend client inactivity timeout.
-    type: number
-  OctaviaTimeoutMemberConnect:
-    default: 5000
-    description: Backend member connection timeout.
-    type: number
-  OctaviaTimeoutMemberData:
-    default: 50000
-    description: Backend member inactivity timeout.
-    type: number
-  OctaviaTimeoutTcpInspect:
-    default: 0
-    description: Time to wait for TCP packets for content inspection.
-    type: number
 
 conditions:
   octavia_topology_unset: {equals : [{get_param: OctaviaLoadBalancerTopology}, ""]}
@@ -96,10 +80,6 @@ outputs:
             octavia::controller::amp_image_tag: {get_param: OctaviaAmphoraImageTag}
             octavia::controller::amp_ssh_key_name: {get_param: OctaviaAmphoraSshKeyName}
             octavia::controller::enable_ssh_access: true
-            octavia::controller::timeout_client_data: {get_param: OctaviaTimeoutClientData}
-            octavia::controller::timeout_member_connect: {get_param: OctaviaTimeoutMemberConnect}
-            octavia::controller::timeout_member_data: {get_param: OctaviaTimeoutMemberData}
-            octavia::controller::timeout_tcp_inspect: {get_param: OctaviaTimeoutTcpInspect}
           -
             if:
             - octavia_topology_unset

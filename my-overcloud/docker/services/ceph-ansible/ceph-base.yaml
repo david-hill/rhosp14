@@ -39,9 +39,9 @@ parameters:
     - allowed_values: ['', 'UPGRADE', 'FASTFORWARDUPGRADE']
     default: ''
   NodeDataLookup:
-    type: string
-    default: '{}'
-    description: json string containing per-node configuration map
+    type: json
+    default: {}
+    description: json containing per-node configuration map
   DeploymentServerBlacklist:
     default: []
     type: comma_delimited_list
@@ -419,7 +419,10 @@ outputs:
             - name: generate nodes-uuid data file
               copy:
                 dest: "{{playbook_dir}}/ceph-ansible/nodes_uuid_data.json"
-                content: {get_param: NodeDataLookup}
+                content:
+                  yaql:
+                    expression: dict($.data.keys().select($.toLower()).zip($.data.values()))
+                    data: {get_param: NodeDataLookup}
             - name: generate nodes-uuid playbook
               copy:
                 dest: "{{playbook_dir}}/ceph-ansible/nodes_uuid_playbook.yml"
@@ -431,7 +434,8 @@ outputs:
                         set_fact:
                           nodes_data: "{% raw %}{{ lookup('file','./nodes_uuid_data.json') | from_json  }}{% endraw %}"
                       - name: register machine id
-                        command: dmidecode -s system-uuid
+                        # awk strips unwanted output, see LP bug #1762460
+                        shell: dmidecode -s system-uuid | awk 'match($0, /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/) { print substr($0, RSTART, RLENGTH) }' | tr A-F a-f
                         register: machine_uuid
                         # NOTE(tonyb): 0 == no error, 1 == -EPERM or bad data and 2 == Command not found
                         # 1 and 2 aren't great but shouldn't cause the deploy to fail.  If we're using
@@ -440,7 +444,7 @@ outputs:
                       - name: generate host vars from nodes data
                         local_action:
                           module: copy
-                          content: "{% raw %}{{nodes_data[machine_uuid.stdout]|default({})|to_nice_yaml}}{% endraw %}"
+                          content: "{% raw %}{{nodes_data[machine_uuid.stdout|default('')]|default({})|to_nice_yaml}}{% endraw %}"
                           dest: "{{playbook_dir}}/ceph-ansible/host_vars/{% raw %}{{inventory_hostname}}{% endraw %}.yml"
         - name: ceph_base_external_deploy_task
           when: step == '2'

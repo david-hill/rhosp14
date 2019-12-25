@@ -96,6 +96,8 @@ outputs:
             - - {get_attr: [IronicConductorBase, role_data, step_config]}
               - {get_attr: [MySQLClient, role_data, step_config]}
         config_image: {get_param: DockerIronicConfigImage}
+        volumes:
+          - /var/lib/ironic:/var/lib/ironic:z
       kolla_config:
         /var/lib/kolla/config_files/ironic_conductor.json:
           command: /usr/bin/ironic-conductor
@@ -171,7 +173,14 @@ outputs:
                 privileged: true
                 restart: always
                 healthcheck:
-                  test: /openstack/healthcheck
+                  test:
+                    list_join:
+                      - ' '
+                      - - '/openstack/healthcheck'
+                        - yaql:
+                            expression: str($.data.port)
+                            data:
+                              port: {get_attr: [IronicConductorBase, role_data, config_settings, 'ironic::rabbit_port']}
                 volumes:
                   list_concat:
                     - {get_attr: [ContainersCommon, volumes]}

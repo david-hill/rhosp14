@@ -249,6 +249,7 @@ with open(sh_script, 'w') as script_file:
     set +e
     # $::deployment_type in puppet-tripleo
     export FACTER_deployment_type=containers
+    export FACTER_uuid=$(cat /sys/class/dmi/id/product_uuid | tr '[:upper:]' '[:lower:]')
     FACTER_hostname=$HOSTNAME /usr/bin/puppet apply --summarize \
     --detailed-exitcodes --color=false --logdest syslog --logdest console --modulepath=/etc/puppet/modules:/usr/share/openstack-puppet/modules $TAGS $CHECK_MODE /etc/config.pp
     rc=$?
@@ -409,7 +410,8 @@ for config_volume in configs:
     else:
         puppet_tags = "file,file_line,concat,augeas,cron"
 
-    process_map.append([config_volume, puppet_tags, manifest, config_image, volumes, check_mode])
+    process_map.append([config_volume, puppet_tags, manifest, config_image,
+                        volumes, check_mode])
 
 for p in process_map:
     log.debug('- %s' % p)

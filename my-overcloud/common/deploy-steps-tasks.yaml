@@ -7,6 +7,14 @@
     - name: Write config data at the start of step 1
       when: step == "1"
       block:
+        - name: Create and ensure setype for /var/log/containers directory
+          file:
+            path: /var/log/containers
+            state: directory
+            setype: var_log_t
+            selevel: s0
+          tags:
+            - host_config
         - name: Create /var/lib/tripleo-config directory
           file:
             path: /var/lib/tripleo-config
@@ -383,6 +391,7 @@
         CONFIG: '/var/lib/docker-puppet/{{ ansible_check_mode | ternary("check-mode/", "") }}docker-puppet.json'
         CONFIG_VOLUME_PREFIX: '/var/lib/config-data{{ ansible_check_mode | ternary("/check-mode", "") }}'
         CHECK_MODE: '{{ ansible_check_mode | ternary(1, 0) }}'
+        STARTUP_CONFIG_PATTERN: '/var/lib/tripleo-config/{{ ansible_check_mode | ternary("check-mode/", "") }}docker-container-startup-config-step_*.json'
       when: step == "1"
       changed_when: false
       check_mode: no

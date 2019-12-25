@@ -11,6 +11,12 @@
   tags:
     - primary
     - controller
+  networks:
+    - External
+    - InternalApi
+    - Storage
+    - StorageMgmt
+    - Tenant
   disable_constraints: True
   ServicesDefault:
     - OS::TripleO::Services::Aide
@@ -55,6 +61,7 @@
     - OS::TripleO::Services::Collectd
     - OS::TripleO::Services::ComputeCeilometerAgent
     - OS::TripleO::Services::Congress
+    - OS::TripleO::Services::ContainerImagePrepare
     - OS::TripleO::Services::ContainersLogrotateCrond
     - OS::TripleO::Services::DesignateApi
     - OS::TripleO::Services::DesignateCentral
@@ -63,6 +70,7 @@
     - OS::TripleO::Services::DesignateSink
     - OS::TripleO::Services::DesignateWorker
     - OS::TripleO::Services::Docker
+    - OS::TripleO::Services::DockerRegistry
     - OS::TripleO::Services::Ec2Api
     - OS::TripleO::Services::Etcd
     - OS::TripleO::Services::ExternalSwiftProxy
@@ -159,6 +167,7 @@
     - OS::TripleO::Services::SaharaApi
     - OS::TripleO::Services::SaharaEngine
     - OS::TripleO::Services::Securetty
+    - OS::TripleO::Services::SELinux
     - OS::TripleO::Services::SensuClient
     - OS::TripleO::Services::SkydiveAgent
     - OS::TripleO::Services::SkydiveAnalyzer

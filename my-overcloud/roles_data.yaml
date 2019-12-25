@@ -192,9 +192,11 @@
     Basic Compute Node role
   CountDefault: 1
   networks:
+    - External
     - InternalApi
     - Tenant
     - Storage
+    - StorageMgmt
   HostnameFormatDefault: '%stackname%-compute-%index%'
   RoleParametersDefault:
     TunedProfileName: "virtual-host"
