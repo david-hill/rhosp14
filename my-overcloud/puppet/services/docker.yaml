@@ -74,23 +74,6 @@ parameters:
     description: Flag to disable docker reconfiguration during stack update.
     tags:
       - role_specific
-  ContainerImageRegistryLogin:
-    type: boolean
-    default: false
-    description: Flag to enable container registry login actions during the deployment.
-                 Setting this to true will cause login calls to be performed during the
-                 deployment.
-  ContainerImageRegistryCredentials:
-    type: json
-    hidden: true
-    default: {}
-    description: |
-      Mapping of image registry hosts to login credentials. Must be in the following example format
-
-        docker.io:
-          username: pa55word
-        '192.0.2.1:8787':
-          registry_username: password
 
 resources:
   # Merging role-specific parameters (RoleParameters) with the default parameters.
@@ -139,23 +122,9 @@ outputs:
               container_registry_mirror: {get_param: DockerRegistryMirror}
               container_registry_network_options: {get_param: DockerNetworkOptions}
               container_registry_skip_reconfiguration: {get_attr: [RoleParametersValue, value, DockerSkipUpdateReconfiguration]}
-              container_registry_login: {get_param: ContainerImageRegistryLogin}
-              # default that is overwritten by the heat -> dict conversion
-              container_registry_logins: {}
-              container_registry_logins_json: {get_param: ContainerImageRegistryCredentials}
-          - name: Convert logins json to dict
-            set_fact:
-              container_registry_logins: "{{ container_registry_logins_json | from_json }}"
-            when:
-              - container_registry_login | bool
-              - (container_registry_logins_json | length) > 0
           - include_role:
               name: container-registry
               tasks_from: docker
-          - include_role:
-              name: container-registry
-              tasks_from: docker-login
-            when: container_registry_login|bool
       service_config_settings:
         neutron_l3:
           docker_additional_sockets: {get_param: DockerAdditionalSockets}
@@ -164,15 +133,9 @@ outputs:
         ovn_metadata:
           docker_additional_sockets: {get_param: DockerAdditionalSockets}
       upgrade_tasks:
-        - block:
-            - name: Install docker packages on upgrade if missing
-              package: name=docker state=latest
-            - set_fact: *docker_vars
-            - name: Reconfigure Docker if needed
-              include_role:
-                name: container-registry
-                tasks_from: docker
+        - name: Install docker packages on upgrade if missing
           when: step|int == 3
+          package: name=docker state=latest
       update_tasks:
         - name: Restart Docker when needed
           when: step|int == 2

@@ -122,7 +122,7 @@ outputs:
       # BEGIN DOCKER SETTINGS #
       puppet_config:
         config_volume: glance_api
-        puppet_tags: glance_api_config,glance_api_paste_ini,glance_swift_config,glance_cache_config,glance_image_import_config
+        puppet_tags: glance_api_config,glance_api_paste_ini,glance_swift_config,glance_cache_config
         step_config:
           list_join:
             - "\n"
@@ -185,7 +185,6 @@ outputs:
                     - cinder_backend_enabled
                     - - /dev:/dev
                       - /etc/iscsi:/etc/iscsi
-                      - /var/lib/iscsi:/var/lib/iscsi
                     - []
             environment:
               - KOLLA_BOOTSTRAP=True
@@ -231,10 +230,6 @@ outputs:
             file:
               path: /etc/ceph
               state: directory
-          - name: ensure /var/lib/glance exists
-            file:
-              path: /var/lib/glance
-              state: directory
       upgrade_tasks:
         - when: step|int == 0
           tags: common
@@ -246,6 +241,10 @@ outputs:
             - name: Set fact glance_api_enabled
               set_fact:
                 glance_api_enabled: "{{ glance_api_enabled_result.rc == 0 }}"
+            - name: "PreUpgrade step0,validation: Check service openstack-glance-api is running"
+              command: systemctl is-active --quiet openstack-glance-api
+              tags: validation
+              when: glance_api_enabled|bool
         - when: step|int == 2
           block:
             - name: Stop and disable glance_api service

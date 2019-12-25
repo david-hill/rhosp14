@@ -17,10 +17,6 @@ parameter_defaults:
   rhel_reg_sat_url: ""
   rhel_reg_server_url: ""
   rhel_reg_service_level: ""
-<<<<<<< HEAD
   rhel_reg_user: "***REMOVED***"
-=======
-  rhel_reg_user: "***REMOVED***"
->>>>>>> d884bd27c423c0840323cf166b73162c3dd4a56c
   rhel_reg_type: ""
   rhel_reg_method: "portal"

@@ -164,12 +164,12 @@ outputs:
                       str_replace:
                         template: "%{hiera('fqdn_NETWORK')}"
                         params:
-                          NETWORK: {get_param: [ServiceNetMap, NovaVncProxyNetwork]}
+                          NETWORK: {get_param: [ServiceNetMap, NovaLibvirtNetwork]}
                     principal:
                       str_replace:
                         template: "libvirt-vnc/%{hiera('fqdn_NETWORK')}"
                         params:
-                          NETWORK: {get_param: [ServiceNetMap, NovaVncProxyNetwork]}
+                          NETWORK: {get_param: [ServiceNetMap, NovaLibvirtNetwork]}
                 novnc_proxy_certificates_specs:
                   service_certificate: '/etc/pki/tls/certs/novnc_proxy.crt'
                   service_key: '/etc/pki/tls/private/novnc_proxy.key'
@@ -183,7 +183,6 @@ outputs:
                       template: "novnc-proxy/%{hiera('fqdn_NETWORK')}"
                       params:
                         NETWORK: {get_param: [ServiceNetMap, NovaApiNetwork]}
-                  postsave_cmd: "/usr/bin/certmonger-novnc-proxy-refresh.sh"
               - {}
       service_config_settings:
         fluentd:
@@ -202,7 +201,7 @@ outputs:
           - use_tls_for_vnc
           -
             - service: libvirt-vnc
-              network: {get_param: [ServiceNetMap, NovaVncProxyNetwork]}
+              network: {get_param: [ServiceNetMap, NovaLibvirtNetwork]}
               type: node
             - service: novnc-proxy
               network: {get_param: [ServiceNetMap, NovaApiNetwork]}

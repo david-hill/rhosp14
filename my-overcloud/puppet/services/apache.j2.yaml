@@ -87,7 +87,6 @@ outputs:
                 params:
                   $NETWORK: {get_param: [ServiceNetMap, ApacheNetwork]}
             apache::default_vhost: false
-            apache::trace_enable: 'Off'
             apache::server_signature: 'Off'
             apache::server_tokens: 'Prod'
             apache_remote_proxy_ips_network:
@@ -100,7 +99,6 @@ outputs:
             apache::mod::prefork::serverlimit: { get_param: ApacheServerLimit }
             apache::mod::remoteip::proxy_ips:
               - "%{hiera('apache_remote_proxy_ips_network')}"
-            apache::mod::alias::icons_options: 'None'
           - if:
             - internal_tls_enabled
             -
@@ -118,7 +116,6 @@ outputs:
                         service_key: '/etc/pki/tls/private/httpd/httpd-NETWORK.key'
                         hostname: "%{hiera('fqdn_NETWORK')}"
                         principal: "HTTP/%{hiera('fqdn_NETWORK')}"
-                        postsave_cmd: "pkill -USR1 httpd"
                     for_each:
                       NETWORK: {get_attr: [ApacheNetworks, value]}
             - {}

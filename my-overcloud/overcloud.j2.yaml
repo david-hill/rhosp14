@@ -396,21 +396,11 @@ resources:
             - {get_attr: [{{role.name}}, known_hosts_hostnames]}
             {% endfor %}
 
-  # Creates the "heat-admin" user if configured via the environment
-  # Should return a OS::Heat::MultipartMime reference via OS::stack_id
-  NodeAdminUserData:
-    type: OS::TripleO::NodeAdminUserData
-
-  # For optional operator additional userdata
-  # Should return a OS::Heat::MultipartMime reference via OS::stack_id
-  NodeUserData:
-    type: OS::TripleO::NodeUserData
-
   # Jinja loop for Role in roles_data.yaml
 {% for role in roles %}
   # Resources generated for {{role.name}} Role
   {{role.name}}ServiceChain:
-    type: OS::TripleO::{{role.name}}Services
+    type: OS::TripleO::Services
     properties:
       Services:
         get_param: {{role.name}}Services
@@ -533,7 +523,7 @@ resources:
     depends_on: {{role.name}}AllNodesDeployment
     properties:
       name: {{role.name}}AllNodesValidationDeployment
-      config: {get_resource: {{role.name}}AllNodesValidationConfig}
+      config: {get_resource: AllNodesValidationConfig}
       servers: {get_attr: [{{role.name}}Servers, value]}
 
   {{role.name}}IpListMap:
@@ -541,7 +531,7 @@ resources:
     properties:
       ControlPlaneIpList: {get_attr: [{{role.name}}, ip_address]}
 {%- for network in networks %}
-  {%- if network.enabled|default(true) and network.name in role.networks|default([]) %}
+  {%- if network.enabled|default(true) %}
       {{network.name}}IpList: {get_attr: [{{role.name}}, {{network.name_lower}}_ip_address]}
   {%- else %}
       {{network.name}}IpList: {get_attr: [{{role.name}}, ip_address]}
@@ -565,23 +555,6 @@ resources:
           expression: dict($.data.where($ != null).flatten().selectMany($.items()).groupBy($[0], $[1]).select([$[0], $[1].flatten()]))
           data:
             - {get_attr: [{{role.name}}, hostname_map]}
-
-  # Combine the NodeAdminUserData and NodeUserData mime archives
-  {{role.name}}UserData:
-    type: OS::Heat::MultipartMime
-    properties:
-      parts:
-      - config: {get_resource: NodeAdminUserData}
-        type: multipart
-      - config: {get_resource: NodeUserData}
-        type: multipart
-      - config: {get_resource: {{role.name}}RoleUserData}
-        type: multipart
-
-  # For optional operator role-specific userdata
-  # Should return a OS::Heat::MultipartMime reference via OS::stack_id
-  {{role.name}}RoleUserData:
-    type: OS::TripleO::{{role.name}}::NodeUserData
 
   {{role.name}}:
     type: OS::Heat::ResourceGroup
@@ -623,7 +596,6 @@ resources:
             map_merge:
               - {{role.RoleParametersDefault|default({})}}
               - get_param: {{role.name}}Parameters
-          UserData: {get_resource: {{role.name}}UserData}
 {% endfor %}
 
 {% for role in roles %}
@@ -713,6 +685,21 @@ resources:
 {% for role in roles %}
           - {get_attr: [{{role.name}}ServiceNames, value]}
 {% endfor %}
+      cellv2_discovery_hosts:
+        # Collects compute hostnames for all roles with a service that requires cellv2 host discovery
+        list_join:
+          - ','
+          - yaql:
+              expression: coalesce($.data.e.zip($.data.l).where($[0]).select($[1]).flatten(),  [])
+              data:
+                e: # list of true/fails for whether cellsv2 host discovery is required for the roles
+{%- for role in roles %}
+                  - {get_attr: [{{role.name}}ServiceChainRoleData, value, cellv2_discovery]}
+{%- endfor %}
+                l: # list of list of compute hostnames for the roles
+{%- for role in roles %}
+                  - {get_attr: [{{role.name}}, hostname_map, canonical]}
+{%- endfor %}
       controller_ips: {get_attr: [{{primary_role_name}}, ip_address]}
       controller_names: {get_attr: [{{primary_role_name}}, hostname]}
       service_ips:
@@ -866,22 +853,18 @@ resources:
     # ServiceNetMap's attribute values are available.
     depends_on: ServiceNetMap
 
-{%- for role in roles %}
   # All Nodes Validations
-  {{role.name}}AllNodesValidationConfig:
+  AllNodesValidationConfig:
     type: OS::TripleO::AllNodes::Validation
     properties:
       PingTestIps:
         list_join:
         - ' '
         -
-{%- for network in networks %}
-  {%- if network.enabled|default(true) and network.name in role.networks|default([]) %}
+{%- for network in networks if network.enabled|default(true) %}
           - yaql:
               expression: coalesce($.data, []).first(null)
-              data: {get_attr: [{{role.name}}, {{network.name_lower}}_ip_address]}
-  {%- endif %}
-{%- endfor %}
+              data: {get_attr: [{{primary_role_name}}, {{network.name_lower}}_ip_address]}
 {%- endfor %}
 
   # Optional ExtraConfig for all nodes - all roles are passed in here, but

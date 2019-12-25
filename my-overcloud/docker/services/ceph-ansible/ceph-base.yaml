@@ -39,9 +39,9 @@ parameters:
     - allowed_values: ['', 'UPGRADE', 'FASTFORWARDUPGRADE']
     default: ''
   NodeDataLookup:
-    type: json
-    default: {}
-    description: json containing per-node configuration map
+    type: string
+    default: '{}'
+    description: json string containing per-node configuration map
   DeploymentServerBlacklist:
     default: []
     type: comma_delimited_list
@@ -113,9 +113,6 @@ parameters:
   NovaRbdPoolName:
     default: vms
     type: string
-    description: The pool name for RBD backend ephemeral storage.
-    tags:
-      - role_specific
   CephClientKey:
     description: The Ceph client key. Can be created with ceph-authtool --gen-print-key.
     type: string
@@ -257,10 +254,7 @@ resources:
                           list_concat_unique:
                             - - {get_param: CinderRbdPoolName}
                               - {get_param: CinderBackupRbdPoolName}
-                              - if:
-                                - equals: [{get_param: [RoleParameters, NovaRbdPoolName]}, '']
-                                - {get_param: NovaRbdPoolName}
-                                - {get_param: [RoleParameters, NovaRbdPoolName]}
+                              - {get_param: NovaRbdPoolName}
                               - {get_param: GlanceRbdPoolName}
                             # CinderRbdExtraPools is a list (do not indent further)
                             - {get_param: CinderRbdExtraPools}
@@ -292,10 +286,7 @@ resources:
                         list_concat_unique:
                         - - {get_param: CinderRbdPoolName}
                           - {get_param: CinderBackupRbdPoolName}
-                          - if:
-                            - equals: [{get_param: [RoleParameters, NovaRbdPoolName]}, '']
-                            - {get_param: NovaRbdPoolName}
-                            - {get_param: [RoleParameters, NovaRbdPoolName]}
+                          - {get_param: NovaRbdPoolName}
                           - {get_param: GlanceRbdPoolName}
                         - if:
                           - equals: [{get_param: GnocchiRbdPoolName}, '']
@@ -428,10 +419,7 @@ outputs:
             - name: generate nodes-uuid data file
               copy:
                 dest: "{{playbook_dir}}/ceph-ansible/nodes_uuid_data.json"
-                content:
-                  yaql:
-                    expression: dict($.data.keys().select($.toLower()).zip($.data.values()))
-                    data: {get_param: NodeDataLookup}
+                content: {get_param: NodeDataLookup}
             - name: generate nodes-uuid playbook
               copy:
                 dest: "{{playbook_dir}}/ceph-ansible/nodes_uuid_playbook.yml"
@@ -443,8 +431,7 @@ outputs:
                         set_fact:
                           nodes_data: "{% raw %}{{ lookup('file','./nodes_uuid_data.json') | from_json  }}{% endraw %}"
                       - name: register machine id
-                        # awk strips unwanted output, see LP bug #1762460
-                        shell: dmidecode -s system-uuid | awk 'match($0, /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/) { print substr($0, RSTART, RLENGTH) }' | tr A-F a-f
+                        command: dmidecode -s system-uuid
                         register: machine_uuid
                         # NOTE(tonyb): 0 == no error, 1 == -EPERM or bad data and 2 == Command not found
                         # 1 and 2 aren't great but shouldn't cause the deploy to fail.  If we're using
@@ -453,7 +440,7 @@ outputs:
                       - name: generate host vars from nodes data
                         local_action:
                           module: copy
-                          content: "{% raw %}{{nodes_data[machine_uuid.stdout|default('')]|default({})|to_nice_yaml}}{% endraw %}"
+                          content: "{% raw %}{{nodes_data[machine_uuid.stdout]|default({})|to_nice_yaml}}{% endraw %}"
                           dest: "{{playbook_dir}}/ceph-ansible/host_vars/{% raw %}{{inventory_hostname}}{% endraw %}.yml"
         - name: ceph_base_external_deploy_task
           when: step == '2'
@@ -492,11 +479,9 @@ outputs:
                 stat: path="{{local_ceph_ansible_fetch_directory_backup}}"
                 register: local_backup_directory
                 ignore_errors: True
-              - name: autocreate new directory for ceph-ansible fetch directory backup
-                file:
-                  path: "{{local_ceph_ansible_fetch_directory_backup}}"
-                  state: directory
-                  mode: 0700
+              - name: ensure requested local back up directory exists
+                fail:
+                  msg: "Process runing Ansible is unable to stat LocalCephAnsibleFetchDirectoryBackup: {{local_ceph_ansible_fetch_directory_backup}}"
                 when: local_backup_directory.stat.exists == False
               - name: look for tarball of ceph-ansible fetch directory in local backup
                 stat: path="{{local_ceph_ansible_fetch_directory_backup}}/{{ceph_ansible_tarball_name}}"
@@ -552,7 +537,6 @@ outputs:
                     - ANSIBLE_CONFIG=/usr/share/ceph-ansible/ansible.cfg
                     - ANSIBLE_REMOTE_TEMP=/tmp/ceph_ansible_tmp
                     - ANSIBLE_FORKS=25
-                    - ANSIBLE_GATHER_TIMEOUT=60
                     - yaql:
                         data: {get_param: CephAnsibleEnvironmentVariables}
                         expression: $.data.items().select($[0] + '=' + $[1]).join(' ')
@@ -589,29 +573,16 @@ outputs:
               when:
                 - outputs.changed
                 - outputs.rc != 0
-            - name: register contents of fetch_directory after ceph-ansible run
-              find:
-                paths: "{{playbook_dir}}/ceph-ansible/fetch_dir/"
-                recurse: true
-              register: ceph_ansible_fetch_dir_contents
             - name: create ceph-ansible fetch directory tarball in local backup
               archive:
-                path: "{{playbook_dir}}/ceph-ansible/fetch_dir/*"
+                path: "{{playbook_dir}}/ceph-ansible/fetch_dir"
                 dest: "{{local_ceph_ansible_fetch_directory_backup}}/{{ceph_ansible_tarball_name}}"
-                exclude_path:
-                    - '{{playbook_dir}}/ceph-ansible/fetch_dir/fetch_dir'
-              register: nested
-              when:
-                - local_ceph_ansible_fetch_directory_backup != ""
-                - ceph_ansible_fetch_dir_contents.matched|int != 0
+              when: local_ceph_ansible_fetch_directory_backup != ""
             - block: # swift backup
               - name: create temporary ceph-ansible fetch directory tarball for swift backup
                 archive:
-                  path: "{{playbook_dir}}/ceph-ansible/fetch_dir/*"
+                  path: "{{playbook_dir}}/ceph-ansible/fetch_dir"
                   dest: "/tmp/{{new_ceph_ansible_tarball_name}}"
-                  exclude_path:
-                      - '{{playbook_dir}}/ceph-ansible/fetch_dir/fetch_dir'
-                register: nested
               - name: backup temporary ceph-ansible fetch directory tarball in swift
                 shell: "curl  -s -o /dev/null -w '%{http_code}' -X PUT -T /tmp/{{new_ceph_ansible_tarball_name}} \"{{ swift_put_url }}\""
                 register: curl_put_http_status
@@ -628,17 +599,7 @@ outputs:
                   state: absent
                 when: (curl_put_http_status.changed and (curl_put_http_status.stdout == "200" or
                        curl_put_http_status.stdout == "201"))
-              when:
-                - local_ceph_ansible_fetch_directory_backup == ""
-                - ceph_ansible_fetch_dir_contents.matched|int != 0
-            - name: remove nested broken path if exist
-              file:
-                state: absent
-                path: "{{ item }}"
-                recurse: no
-              with_items:
-                - '{{ nested.missing }}'
-              when: (nested.missing|default([])|length > 0)
+              when: local_ceph_ansible_fetch_directory_backup == ""
       external_update_tasks:
         - when: step|int == 0
           tags: ceph

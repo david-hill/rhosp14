@@ -3,17 +3,10 @@
     ##################################################
     # Step 1 block, write data for subsequent steps
     ##################################################
+
     - name: Write config data at the start of step 1
       when: step == "1"
       block:
-        - name: Create and ensure setype for /var/log/containers directory
-          file:
-            path: /var/log/containers
-            state: directory
-            setype: var_log_t
-            selevel: s0
-          tags:
-            - host_config
         - name: Create /var/lib/tripleo-config directory
           file:
             path: /var/lib/tripleo-config
@@ -260,6 +253,33 @@
           tags:
             - container_startup_configs
 
+        ########################################################
+        # Bootstrap tasks, only performed on bootstrap_server_id
+        ########################################################
+
+        - name: Clean /var/lib/docker-puppet/docker-puppet-tasks*.json files
+          file:
+            path: "{{ item }}"
+            state: absent
+          with_fileglob:
+            - /var/lib/docker-puppet/docker-puppet-tasks*.json
+          when: deploy_server_id == bootstrap_server_id
+          tags:
+            - container_config_tasks
+
+        - name: Write docker-puppet-tasks json files
+          copy:
+            content: "{{item[1]|to_nice_json}}"
+            dest: /var/lib/docker-puppet/docker-puppet-tasks{{item[0].replace("step_", "")}}.json
+            force: yes
+            mode: '0600'
+          loop: "{{ lookup('file', tripleo_role_name + '/docker_puppet_tasks.yaml', errors='ignore') | default({}, True) | from_yaml | dictsort }}"
+          loop_control:
+            label: "{{ item[0] }}"
+          when: deploy_server_id == bootstrap_server_id
+          tags:
+            - container_config_tasks
+
     #####################################################
     # Per step puppet configuration of the baremetal host
     #####################################################
@@ -363,7 +383,6 @@
         CONFIG: '/var/lib/docker-puppet/{{ ansible_check_mode | ternary("check-mode/", "") }}docker-puppet.json'
         CONFIG_VOLUME_PREFIX: '/var/lib/config-data{{ ansible_check_mode | ternary("/check-mode", "") }}'
         CHECK_MODE: '{{ ansible_check_mode | ternary(1, 0) }}'
-        STARTUP_CONFIG_PATTERN: '/var/lib/tripleo-config/{{ ansible_check_mode | ternary("check-mode/", "") }}docker-container-startup-config-step_*.json'
       when: step == "1"
       changed_when: false
       check_mode: no
@@ -416,8 +435,6 @@
     # the *step_n.json with a hash of the generated external config added
     # This acts as a salt to enable restarting the container if config changes
     - name: Start containers for step {{ step }}
-      environment:
-        TRIPLEO_MINOR_UPDATE: '{{ tripleo_minor_update | default(false) }}'
       command: >-
         paunch --debug apply
         --file /var/lib/tripleo-config/hashed-docker-container-startup-config-step_{{ step }}.json
@@ -438,35 +455,15 @@
         - container_startup_configs
 
     ########################################################
-    # Bootstrap tasks - run any tasks that have been defined
+    # Bootstrap tasks, only performed on bootstrap_server_id
     ########################################################
 
-    - name: "Clean docker_puppet_tasks for {{ansible_hostname}} step {{step}}"
-      file:
-        path: /var/lib/docker-puppet/docker-puppet-tasks{{step}}.json
-        state: absent
+    - name: Check if /var/lib/docker-puppet/docker-puppet-tasks{{ step }}.json exists
+      stat:
+        path: /var/lib/docker-puppet/{{ ansible_check_mode | ternary('check-mode/', '') }}docker-puppet-tasks{{ step }}.json
+      register: docker_puppet_tasks_json
       tags:
         - container_config_tasks
-
-    - name: Calculate docker_puppet_tasks for {{ansible_hostname}} step {{step}}
-      set_fact:
-        host_docker_puppet_tasks: "{{host_docker_puppet_tasks|default([]) + [item]}}"
-      loop: "{{docker_puppet_tasks.get('step_' + step, [])}}"
-      when: vars[item.service_name + '_short_bootstrap_node_name'] == ansible_hostname
-      vars:
-        docker_puppet_tasks: "{{ lookup('file', tripleo_role_name + '/docker_puppet_tasks.yaml', errors='ignore') | default({}, True) | from_yaml }}"
-      tags:
-        - container_config_tasks
-
-    - name: Write docker-puppet-tasks json file for {{ansible_hostname}} step {{step}}
-      copy:
-        content: "{{host_docker_puppet_tasks|to_nice_json}}"
-        dest: "/var/lib/docker-puppet/docker-puppet-tasks{{step}}.json"
-        force: yes
-        mode: '0600'
-      tags:
-        - container_config_tasks
-      when: host_docker_puppet_tasks is defined
 
     - name: Run docker-puppet tasks (bootstrap tasks) for step {{ step }}
       shell: python /var/lib/docker-puppet/docker-puppet.py
@@ -476,7 +473,9 @@
         NET_HOST: "true"
         NO_ARCHIVE: "true"
         STEP: "{{ step }}"
-      when: host_docker_puppet_tasks is defined
+      when:
+        - deploy_server_id == bootstrap_server_id
+        - docker_puppet_tasks_json.stat.exists
       changed_when: false
       register: outputs
       failed_when: false

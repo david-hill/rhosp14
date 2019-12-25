@@ -40,20 +40,6 @@ parameters:
     default: ""
     tags:
       - role_specific
-  OvsHandlerCores:
-    description: >
-      Number of cores to be used for ovs handler threads.
-    type: string
-    default: ""
-    tags:
-      - role_specific
-  OvsRevalidatorCores:
-    description: >
-      Number of cores to be used for ovs revalidator threads.
-    type: string
-    default: ""
-    tags:
-      - role_specific
   OvsDpdkMemoryChannels:
     description: Number of memory channels per socket to be used for DPDK
     type: string
@@ -97,13 +83,6 @@ parameters:
     default: ""
     tags:
       - role_specific
-  OvsDisableEMC:
-    default: false
-    description: |
-      Disable OVS Exact Match Cache.
-    type: boolean
-    tags:
-      - role_specific
 
 outputs:
   role_data:
@@ -118,9 +97,6 @@ outputs:
               vswitch::dpdk::pmd_core_list: OvsPmdCoreList
               vswitch::dpdk::memory_channels: OvsDpdkMemoryChannels
               vswitch::dpdk::socket_mem: OvsDpdkSocketMemory
-              vswitch::dpdk::disable_emc: OvsDisableEMC
-              vswitch::dpdk::revalidator_cores: OvsRevalidatorCores
-              vswitch::dpdk::handler_cores: OvsHandlerCores
             - values: {get_param: [RoleParameters]}
           - values:
               OvsDpdkCoreList: {get_param: OvsDpdkCoreList}
@@ -128,6 +104,3 @@ outputs:
               OvsDpdkSocketMemory: {get_param: OvsDpdkSocketMemory}
               OvsDpdkDriverType: {get_param: OvsDpdkDriverType}
               OvsPmdCoreList: {get_param: OvsPmdCoreList}
-              OvsDisableEMC: {get_param: OvsDisableEMC}
-              OvsRevalidatorCores: {get_param: OvsRevalidatorCores}
-              OvsHandlerCores: {get_param: OvsHandlerCores}

@@ -1,9 +1,4 @@
-parameter_merge_strategies:
-  default: overwrite
-  UndercloudExtraConfig: deep_merge
-
 resource_registry:
-  OS::TripleO::Services::Tmpwatch: ../extraconfig/services/tmpwatch-install.yaml
   OS::TripleO::Network::Ports::RedisVipPort: ../network/ports/noop.yaml
   OS::TripleO::Network::Ports::ControlPlaneVipPort: ../deployed-server/deployed-neutron-port.yaml
   OS::TripleO::Undercloud::Net::SoftwareConfig: ../net-config-undercloud.yaml
@@ -76,7 +71,6 @@ parameter_defaults:
   HeatMaxResourcesPerStack: -1
   HeatMaxJsonBodySize: 4194304
   HeatReauthenticationAuthMethod: 'trusts'
-  HeatYaqlLimitIterators: 10000
   IronicCleaningDiskErase: 'metadata'
   IronicCorsAllowedOrigin: '*'
   IronicDefaultInspectInterface: 'inspector'
@@ -102,8 +96,8 @@ parameter_defaults:
   IronicForcePowerStateDuringSync: false
   IronicInspectorCollectors: default,extra-hardware,numa-topology,logs
   IronicInspectorInterface: br-ctlplane
-  # IronicInspectorSubnets:
-  #   - ip_range: '192.168.24.100,192.168.24.200'
+  IronicInspectorSubnets:
+    - ip_range: '192.168.24.100,192.168.24.200'
   IronicProvisioningNetwork: 'ctlplane'
   IronicRescuingNetwork: 'ctlplane'
   ZaqarMessageStore: 'swift'
@@ -123,11 +117,6 @@ parameter_defaults:
   NeutronVniRanges: '10:100'
   NeutronPortQuota: '-1'
   SwiftCorsAllowedOrigin: '*'
-  SwiftReplicas: 1
-  SwiftWorkers: 2
-  SwiftAccountWorkers: 2
-  SwiftContainerWorkers: 2
-  SwiftObjectWorkers: 2
   # A list of static routes for the control plane network. Ensure traffic to
   # nodes on remote control plane networks use the correct network path.
   # Example:
@@ -137,20 +126,12 @@ parameter_defaults:
   #     - ip_netmask: 192.168.26.0/24
   #       next_hop: 192.168.24.1
   ControlPlaneStaticRoutes: []
-  # A dictionary of Undercloud ctlplane subnets.
-  # NOTE(hjensas): This should be {} in this environment file, otherwise it may
-  # results in values set here being merged with the values set in
-  # undercloud.conf. See Bug: https://bugs.launchpad.net/tripleo/+bug/1820330
-  # Example:
-  #   UndercloudCtlplaneSubnets:
-  #     ctlplane-subnet:
-  #       NetworkCidr: '192.168.24.0/24'
-  #       NetworkGateway: '192.168.24.1'
-  #       DhcpRangeStart: '192.168.24.5'
-  #       DhcpRangeEnd: '192.168.24.24'
-  #       HostRoutes:
-  #         - {'destination': '10.10.10.0/24', 'nexthop': '192.168.24.254'}
-  UndercloudCtlplaneSubnets: {}
+  UndercloudCtlplaneSubnets:
+    ctlplane-subnet:
+      NetworkCidr: '192.168.24.0/24'
+      NetworkGateway: '192.168.24.1'
+      DhcpRangeStart: '192.168.24.5'
+      DhcpRangeEnd: '192.168.24.24'
   UndercloudCtlplaneLocalSubnet: 'ctlplane-subnet'
   MistralDockerGroup: true
   PasswordAuthentication: 'yes'
@@ -165,33 +146,3 @@ parameter_defaults:
     - /usr/share/openstack-octavia-amphora-images:/usr/share/openstack-octavia-amphora-images:ro
   NeutronMetadataProxySharedSecret: ''
   MetadataNATRule: true
-  UndercloudExtraConfig:
-    aodh::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    barbican::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    ceilometer::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    cinder::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    congress::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    ec2api::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    glance::api::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    gnocchi::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    heat::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    heat::cache::memcache_servers: "%{hiera('memcached::listen_ip')}:11211"
-    horizon::cache_server_ip: "%{hiera('memcached::listen_ip')}:11211"
-    ironic::api::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    ironic::inspector::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    keystone::cache_memcache_servers: "%{hiera('memcached::listen_ip')}:11211"
-    manila::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    manila::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    mistral::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    neutron::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    nova::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    nova::cache::memcache_servers: "%{hiera('memcached::listen_ip')}:11211"
-    nova::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    panko::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    sahara::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    swift::proxy::authtoken::memcache_servers: "%{hiera('memcached::listen_ip')}:11211"
-    swift::proxy::cache::memcache_servers: "%{hiera('memcached::listen_ip')}:11211"
-    tacker::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    zaqar::keystone::authtoken::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-    swift::objectexpirer::memcached_servers: "%{hiera('memcached::listen_ip')}:11211"
-  SshFirewallAllowAll: true

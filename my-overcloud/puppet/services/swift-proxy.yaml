@@ -43,7 +43,7 @@ parameters:
     description: Timeout for requests going from swift-proxy to swift a/c/o services.
     type: number
   SwiftWorkers:
-    default: 0
+    default: auto
     description: Number of workers for Swift service.
     type: string
   KeystoneRegion:
@@ -98,7 +98,6 @@ conditions:
   use_tls_proxy: {equals : [{get_param: EnableInternalTLS}, true]}
   swift_encryption_enabled: {equals : [{get_param: SwiftEncryptionEnabled}, true]}
   cors_allowed_origin_unset: {equals : [{get_param: SwiftCorsAllowedOrigin}, '']}
-  swift_workers_zero: {equals : [{get_param: SwiftWorkers}, '0']}
 
 resources:
   SwiftBase:
@@ -141,11 +140,7 @@ outputs:
             swift::proxy::authtoken::project_name: 'service'
             swift::proxy::s3token::auth_uri: {get_param: [EndpointMap, KeystoneV3Internal, uri]}
             swift::proxy::node_timeout: {get_param: SwiftProxyNodeTimeout}
-          -
-            if:
-            - swift_workers_zero
-            - {}
-            - swift::proxy::workers: {get_param: SwiftWorkers}
+            swift::proxy::workers: {get_param: SwiftWorkers}
           -
             if:
             - ceilometer_pipeline_enabled
@@ -251,7 +246,7 @@ outputs:
             swift::proxy::proxy_local_net_ip:
               if:
               - use_tls_proxy
-              - "%{hiera('localhost_address')}"
+              - 'localhost'
               - str_replace:
                   template:
                     "%{hiera('$NETWORK')}"

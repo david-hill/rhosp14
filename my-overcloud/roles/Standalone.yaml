@@ -11,12 +11,6 @@
   tags:
     - primary
     - controller
-  networks:
-    - External
-    - InternalApi
-    - Storage
-    - StorageMgmt
-    - Tenant
   disable_constraints: True
   ServicesDefault:
     - OS::TripleO::Services::Aide
@@ -50,7 +44,6 @@
     - OS::TripleO::Services::CinderBackendDellPs
     - OS::TripleO::Services::CinderBackendDellSc
     - OS::TripleO::Services::CinderBackendNVMeOF
-    - OS::TripleO::Services::CinderBackendPure
     - OS::TripleO::Services::CinderBackendNetApp
     - OS::TripleO::Services::CinderBackendScaleIO
     - OS::TripleO::Services::CinderBackendVRTSHyperScale
@@ -62,7 +55,6 @@
     - OS::TripleO::Services::Collectd
     - OS::TripleO::Services::ComputeCeilometerAgent
     - OS::TripleO::Services::Congress
-    - OS::TripleO::Services::ContainerImagePrepare
     - OS::TripleO::Services::ContainersLogrotateCrond
     - OS::TripleO::Services::DesignateApi
     - OS::TripleO::Services::DesignateCentral
@@ -71,7 +63,6 @@
     - OS::TripleO::Services::DesignateSink
     - OS::TripleO::Services::DesignateWorker
     - OS::TripleO::Services::Docker
-    - OS::TripleO::Services::DockerRegistry
     - OS::TripleO::Services::Ec2Api
     - OS::TripleO::Services::Etcd
     - OS::TripleO::Services::ExternalSwiftProxy
@@ -87,7 +78,6 @@
     - OS::TripleO::Services::HeatApiCloudwatch
     - OS::TripleO::Services::HeatEngine
     - OS::TripleO::Services::Horizon
-    - OS::TripleO::Services::IpaClient
     - OS::TripleO::Services::Ipsec
     - OS::TripleO::Services::IronicApi
     - OS::TripleO::Services::IronicConductor
@@ -169,7 +159,6 @@
     - OS::TripleO::Services::SaharaApi
     - OS::TripleO::Services::SaharaEngine
     - OS::TripleO::Services::Securetty
-    - OS::TripleO::Services::SELinux
     - OS::TripleO::Services::SensuClient
     - OS::TripleO::Services::SkydiveAgent
     - OS::TripleO::Services::SkydiveAnalyzer
@@ -181,7 +170,6 @@
     - OS::TripleO::Services::SwiftStorage
     - OS::TripleO::Services::Tacker
     - OS::TripleO::Services::Timezone
-    - OS::TripleO::Services::Tmpwatch
     - OS::TripleO::Services::TripleoFirewall
     - OS::TripleO::Services::TripleoPackages
     - OS::TripleO::Services::Tuned

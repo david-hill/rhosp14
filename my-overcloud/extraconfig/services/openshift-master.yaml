@@ -59,6 +59,10 @@ parameters:
     default: '/usr/share/ansible/openshift-ansible/playbooks/openshift-node/scaleup.yml'
     description: Path to OpenShift-Ansible node scale-up playbook.
     type: string
+  OpenShiftUpgradePlaybook:
+    default: '/usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/upgrades/v3_11/upgrade.yml'
+    description: Path to OpenShift-Ansible Upgrade playbook.
+    type: string
   OpenShiftGlobalVariables:
     default: {}
     description: Global Ansible variables for OpenShift-Ansible installer.
@@ -96,42 +100,6 @@ parameters:
     type: string
   DockerOpenShiftAnsibleServiceBrokerImage:
     description: Ansible Service Broker image for openshift
-    type: string
-  DockerOpenShiftConsoleImage:
-    description: console container image for openshift
-    type: string
-  DockerOpenShiftPrometheusNodeExporterImage:
-    description: prometheus node exporter container image for openshift
-    type: string
-  DockerOpenShiftKubeRbacProxyImage:
-    description: kube rbac proxy container image for openshift
-    type: string
-  DockerOpenShiftClusterMonitorOperatorImage:
-    description: cluster monitoring operator container image for openshift
-    type: string
-  DockerOpenShiftConfigmapReloaderImage:
-    description: configmap reloader container image for openshift
-    type: string
-  DockerOpenShiftPrometheusOperatorImage:
-    description: prometheus operator container image for openshift
-    type: string
-  DockerOpenShiftPrometheusConfigReloaderImage:
-    description: prometheus config reloader container image for openshift
-    type: string
-  DockerOpenShiftPrometheusImage:
-    description: prometheus container image for openshift
-    type: string
-  DockerOpenShiftPrometheusAlertmanagerImage:
-    description: prometheus alertmanager container image for openshift
-    type: string
-  DockerOpenShiftOauthProxyImage:
-    description: oauth proxy container image for openshift
-    type: string
-  DockerOpenShiftKubeStateMetricsImage:
-    description: kube state metrics container image for openshift
-    type: string
-  DockerOpenShiftGrafanaImage:
-    description: grafana container image for openshift
     type: string
 
 resources:
@@ -183,10 +151,6 @@ outputs:
                   file:
                     path: "{{playbook_dir}}/openshift/inventory"
                     state: absent
-                - name: remove global_gluster_vars
-                  file:
-                    path: "{{playbook_dir}}/openshift/global_gluster_vars.yml"
-                    state: absent
                 - name: create openshift inventory directory
                   file:
                     path: "{{playbook_dir}}/openshift/inventory"
@@ -229,68 +193,6 @@ outputs:
                         osn_image: {get_param: DockerOpenShiftNodeImage}
                         openshift_cockpit_deployer_image: {get_param: DockerOpenShiftCockpitImage}
                         ansible_service_broker_image: {get_param: DockerOpenShiftAnsibleServiceBrokerImage}
-                        openshift_console_image_name: {get_param: DockerOpenShiftConsoleImage}
-                        openshift_cluster_monitoring_operator_image: {get_param: DockerOpenShiftClusterMonitorOperatorImage}
-                        openshift_cluster_monitoring_operator_node_exporter_repo:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftPrometheusNodeExporterImage}
-                        openshift_cluster_monitoring_operator_kube_rbac_proxy_image:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftKubeRbacProxyImage}
-                        openshift_cluster_monitoring_operator_configmap_reloader_repo:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftConfigmapReloaderImage}
-                        openshift_cluster_monitoring_operator_prometheus_operator_repo:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftPrometheusOperatorImage}
-                        openshift_cluster_monitoring_operator_prometheus_reloader_repo:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftPrometheusConfigReloaderImage}
-                        openshift_cluster_monitoring_operator_prometheus_repo:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftPrometheusImage}
-                        openshift_cluster_monitoring_operator_alertmanager_repo:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftPrometheusAlertmanagerImage}
-                        openshift_cluster_monitoring_operator_proxy_image:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftOauthProxyImage}
-                        openshift_cluster_monitoring_operator_kube_state_metrics_image:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftKubeStateMetricsImage}
-                        openshift_cluster_monitoring_operator_grafana_image:
-                          yaql:
-                            expression:
-                              $.data.image.rightSplit(":", 1)[0]
-                            data:
-                              image: {get_param: DockerOpenShiftGrafanaImage}
                       - {get_param: OpenShiftGlobalVariables}
                     tripleo_stack_action: {get_param: StackAction}
                     openshift_master_node_vars: {get_param: OpenShiftMasterNodeVars}
@@ -298,26 +200,50 @@ outputs:
                       openshift_master_cluster_hostname: {get_param: [EndpointMap, OpenshiftInternal, host]}
                       openshift_master_cluster_public_hostname: {get_param: [EndpointMap, OpenshiftPublic, host]}
 
+                # NOTE(flaper87): Check if the node service is running in the
+                # openshift nodes so we can flag the node as new later on.
+                - name: Check if node service is running
+                  command: "systemctl is-active --quiet {{tripleo_openshift_service_type}}-node"
+                  register: node_services
+                  delegate_to: "{{item}}"
+                  with_items: "{{ groups[tripleo_role_name] | default([]) }}"
+                  failed_when: false
+
+                # We consider new_node all the nodes that exited with a non-zero
+                # status in the previous task *IF* this is a stack update.
+                # Openshift-ansible expects nodes to be in the new_nodes group for
+                # scale up operation only.
+                - set_fact:
+                    nodes:
+                      - new_node: "{{tripleo_stack_action == 'UPDATE' and node_services.results | selectattr('item', 'equalto', item) | selectattr('rc', 'greaterthan', 0) | list | count > 0}}"
+                        hostname: "{{item}}"
+                  register: all_master_nodes
+                  with_items: "{{groups[tripleo_role_name] | default([]) }}"
+
+                - set_fact:
+                    master_nodes: "{{all_master_nodes.results | map(attribute='ansible_facts') | map(attribute='nodes') | flatten | selectattr('new_node', 'equalto', False) | list}}"
+                    new_master_nodes: "{{all_master_nodes.results | map(attribute='ansible_facts') | map(attribute='nodes') | flatten | selectattr('new_node', 'equalto', True) | list}}"
+
                 - name: generate openshift inventory for openshift_master service
                   copy:
                     dest: "{{playbook_dir}}/openshift/inventory/{{tripleo_role_name}}_openshift_master.yml"
                     content: |
-                      {% if (role_nodes[tripleo_role_name] + new_role_nodes[tripleo_role_name]) | count > 0%}
+                      {% if (master_nodes + new_master_nodes) | count > 0%}
                       all:
                         children:
                           masters:
                             hosts:
-                              {% for host in role_nodes[tripleo_role_name] -%}
+                              {% for host in master_nodes -%}
                               {{host.hostname}}:
                               {% endfor %}
 
                             vars:
                               {{openshift_master_node_vars | to_nice_yaml() | indent(6)}}
 
-                          {% if new_role_nodes[tripleo_role_name] | count > 0 -%}
+                          {% if new_master_nodes | count > 0 -%}
                           new_masters:
                             hosts:
-                              {% for host in new_role_nodes[tripleo_role_name] -%}
+                              {% for host in new_master_nodes -%}
                               {{host.hostname}}:
                               {% endfor %}
 
@@ -367,6 +293,7 @@ outputs:
                     openshift_master_scaleup_playbook_path: {get_param: OpenShiftMasterScaleupPlaybook}
                     openshift_etcd_scaleup_playbook_path: {get_param: OpenShiftEtcdScaleupPlaybook}
                     openshift_worker_scaleup_playbook_path: {get_param: OpenShiftWorkerScaleupPlaybook}
+                    openshift_upgrade_playbook_path: {get_param: OpenShiftUpgradePlaybook}
                     openshift_ansible_image: {get_param: DockerOpenShiftAnsibleImage}
 
                 # NOTE(flaper87): We'll use openshift_ansible_scaleup_playbook_path
@@ -430,13 +357,29 @@ outputs:
                             service:
                               name: dnsmasq
                               state: restarted
-                      {% if new_role_nodes[tripleo_role_name] | count > 0 %}
+                      {% if new_master_nodes | count > 0 %}
                       # Scale up nodes (including masters)
                       - include: "{{openshift_master_scaleup_playbook_path}}"
                       {% else %}
                       # Scale up workers/infra nodes
                       - include: "{{openshift_worker_scaleup_playbook_path}}"
                       {% endif %}
+                      {% endif %}
+
+                      {% if openshift_upgrade is defined and openshift_upgrade %}
+                      # Upgrade openshift
+                      - include: "{{openshift_upgrade_playbook_path}}"
+                      {% else %}
+                      # Re-run the deploy playbook to apply potential change
+                      # changes to existing nodes
+                      - include: "{{openshift_ansible_playbook_path}}"
+                      - name: Restart masters
+                        hosts: masters
+                        serial: 1
+                        tasks:
+                        - import_role:
+                            name: /usr/share/ansible/openshift-ansible/roles/openshift_control_plane
+                            tasks_from: restart.yml
                       {% endif %}
                       {% endif %}
 
@@ -464,29 +407,29 @@ outputs:
                 # view of osa and need to be moved from new_masters and
                 # new_nodes group to masters and nodes groups respectively. In
                 # addition they need to be added to new_etcd groups.
-                - when: tripleo_stack_action == 'UPDATE' and new_role_nodes[tripleo_role_name] | count > 0
+                - when: tripleo_stack_action == 'UPDATE' and new_master_nodes | count > 0
                   block:
 
                   - name: generate updated openshift inventory for openshift_master service
                     copy:
                       dest: "{{playbook_dir}}/openshift/inventory/{{tripleo_role_name}}_openshift_master.yml"
                       content: |
-                        {% if (role_nodes[tripleo_role_name] + new_role_nodes[tripleo_role_name]) | count > 0%}
+                        {% if (master_nodes + new_master_nodes) | count > 0%}
                         all:
                           children:
                             masters:
                               hosts:
-                                {% for host in (role_nodes[tripleo_role_name] + new_role_nodes[tripleo_role_name]) -%}
+                                {% for host in (master_nodes + new_master_nodes) -%}
                                 {{host.hostname}}:
                                 {% endfor %}
 
                               vars:
                                 {{openshift_master_node_vars | to_nice_yaml() | indent(6)}}
 
-                            {% if new_role_nodes[tripleo_role_name] | count > 0 -%}
+                            {% if new_master_nodes | count > 0 -%}
                             new_etcd:
                               hosts:
-                                {% for host in new_role_nodes[tripleo_role_name] -%}
+                                {% for host in new_master_nodes -%}
                                 {{host.hostname}}:
                                 {% endfor %}
 
@@ -500,18 +443,18 @@ outputs:
                     copy:
                       dest: "{{playbook_dir}}/openshift/inventory/{{tripleo_role_name}}_groups.yml"
                       content: |
-                        {% if (role_nodes[tripleo_role_name] + new_role_nodes[tripleo_role_name]) | count > 0%}
+                        {% if (master_nodes + new_master_nodes) | count > 0%}
                         all:
                           children:
                             nodes:
                               hosts:
-                                {% for host in (role_nodes[tripleo_role_name] + new_role_nodes[tripleo_role_name]) -%}
+                                {% for host in (master_nodes + new_master_nodes) -%}
                                 {{host.hostname}}:
                                 {% endfor %}
 
                         {% endif %}
 
-                  - name: generate openshift playbook for etcd scaleup
+                  - name: generate openshift validation playbook
                     copy:
                       dest: "{{playbook_dir}}/openshift/playbook.yml"
                       content: |
@@ -524,48 +467,6 @@ outputs:
                   - name: run openshift (immediate log at {{playbook_dir}}/openshift/playbook-etcd.log)
                     shell: |
                       {{openshift_command}} 2>&1 | tee {{playbook_dir}}/openshift/playbook-etcd.log
-                      exit ${PIPESTATUS[0]}
-
-                - name: generate post-deployment inventory for master nodes
-                  copy:
-                    dest: "{{playbook_dir}}/openshift/inventory/{{tripleo_role_name}}_openshift_master.yml"
-                    content: |
-                      {% if (role_nodes[tripleo_role_name] + new_role_nodes[tripleo_role_name]) | count > 0%}
-                      all:
-                        children:
-                          masters:
-                            hosts:
-                              {% for host in (role_nodes[tripleo_role_name] + new_role_nodes[tripleo_role_name]) -%}
-                              {{host.hostname}}:
-                              {% endfor %}
-
-                            vars:
-                              {{openshift_master_node_vars | to_nice_yaml() | indent(6)}}
-                      {% endif %}
-
-                - when: tripleo_stack_action == 'UPDATE'
-                  block:
-                  - name: generate openshift playbook
-                    copy:
-                      dest: "{{playbook_dir}}/openshift/playbook.yml"
-                      content: |
-                        # Re-run the deploy playbook to apply potential change
-                        # changes to existing nodes
-                        - import_playbook: "{{openshift_ansible_playbook_path}}"
-                        - name: Restart masters
-                          hosts: masters
-                          serial: 1
-                          tasks:
-                          - import_role:
-                              name: /usr/share/ansible/openshift-ansible/roles/openshift_control_plane
-                              tasks_from: restart.yml
-
-                  - name: print openshift command
-                    debug:
-                      var: openshift_command
-                  - name: run openshift (immediate log at {{playbook_dir}}/openshift/playbook.log)
-                    shell: |
-                      {{openshift_command}} 2>&1 | tee {{playbook_dir}}/openshift/playbook.log
                       exit ${PIPESTATUS[0]}
 
                 - name: generate openshift validation playbook
@@ -644,3 +545,11 @@ outputs:
                   shell: |
                     {{openshift_command}} 2>&1 | tee {{playbook_dir}}/openshift/playbook-validation.log
                     exit ${PIPESTATUS[0]}
+
+      external_upgrade_tasks:
+        - when: step|int == 0
+          tags: openshift
+          block:
+            - name: set OpenShift upgrade facts
+              set_fact:
+                openshift_upgrade: true

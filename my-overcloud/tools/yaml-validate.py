@@ -174,10 +174,10 @@ PARAMETER_DEFINITION_EXCLUSIONS = {'CephPools': ['description',
                                                                'constraints'],
                                    # NOTE(anil): This is a temporary change and
                                    # will be removed once bug #1767070 properly
-                                   # fixed. OVN supports only VLAN, geneve
-                                   # and flat for NeutronNetworkType. But VLAN
-                                   # tenant networks have a limited support
-                                   # in OVN. Till that is fixed, we restrict
+                                   # fixed. OVN supports only VLAN and geneve
+                                   # for NeutronNetworkType. But VLAN tenant
+                                   # networks have a limited support in OVN.
+                                   # Till that is fixed, we restrict
                                    # NeutronNetworkType to 'geneve'.
                                    'NeutronNetworkType': ['description',
                                                           'default',
@@ -453,7 +453,7 @@ def validate_controller_no_ceph_role(filename, tpl):
                 return 1
     return 0
 
-def validate_with_compute_role_services(role_filename, role_tpl, exclude_service=()):
+def validate_with_compute_role_services(role_filename, role_tpl, exclude_service):
     cmpt_filename = os.path.join(os.path.dirname(role_filename),
                                  './Compute.yaml')
     cmpt_tpl = yaml.load(open(cmpt_filename).read())
@@ -467,27 +467,8 @@ def validate_with_compute_role_services(role_filename, role_tpl, exclude_service
               'ServicesDefault in roles/Compute.yaml'.format(role_filename,
               ', '.join(missing_services)))
         return 1
-
-    cmpt_us = cmpt_tpl[0].get('update_serial', None)
-    tpl_us = role_tpl[0].get('update_serial', None)
-
-    if 'OS::TripleO::Services::CephOSD' in role_services:
-        if tpl_us not in (None, 1):
-            print('ERROR: update_serial in {0} ({1}) '
-                  'is should be 1 as it includes CephOSD'.format(
-                      role_filename,
-                      tpl_us,
-                      cmpt_us))
-            return 1
-    elif cmpt_us is not None and tpl_us != cmpt_us:
-        print('ERROR: update_serial in {0} ({1}) '
-              'does not match roles/Compute.yaml {2}'.format(
-                  role_filename,
-                  tpl_us,
-                  cmpt_us))
-        return 1
-
     return 0
+
 
 def validate_multiarch_compute_roles(role_filename, role_tpl):
     errors = 0
@@ -1094,15 +1075,13 @@ def validate(filename, param_map):
         if filename.startswith('./roles/'):
             retval = validate_role_name(filename)
 
-        if filename.startswith('./roles/ComputeHCI.yaml') or \
-                filename.startswith('./roles/ComputeHCIOvsDpdk.yaml'):
+        if filename.startswith('./roles/ComputeHCI.yaml'):
             retval |= validate_hci_computehci_role(filename, tpl)
 
         if filename.startswith('./roles/ComputeOvsDpdk.yaml') or \
                 filename.startswith('./roles/ComputeSriov.yaml') or \
                 filename.startswith('./roles/ComputeOvsDpdkRT.yaml') or \
-                filename.startswith('./roles/ComputeSriovRT.yaml') or \
-                filename.startswith('./roles/ComputeHCIOvsDpdk.yaml'):
+                filename.startswith('./roles/ComputeSriovRT.yaml'):
             exclude = [
                 'OS::TripleO::Services::OVNController',
                 'OS::TripleO::Services::ComputeNeutronOvsAgent',
@@ -1129,10 +1108,6 @@ def validate(filename, param_map):
 
         if filename == './roles/Compute.yaml':
             retval |= validate_multiarch_compute_roles(filename, tpl)
-
-        if filename in ('./roles/ComputeLocalEphemeral.yaml',
-                        './roles/ComputeRBDEphemeral.yaml'):
-            retval |= validate_with_compute_role_services(filename, tpl)
 
         # NOTE(hjensas): The routed network data example is very different ...
         # We need to develop a more advanced validator, probably using a schema

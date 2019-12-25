@@ -52,20 +52,16 @@ outputs:
             privileged: false
             user: root
             volumes:
-              - /var/log/containers/tempest:/var/log/tempest:z
-              - /var/lib/tempestdata:/var/lib/tempest:z
-            command: ['/bin/bash', '-c', 'chown -R tempest:tempest /var/log/tempest /var/lib/tempest']
+              - /var/log/containers/tempest:/var/log/tempest
+            command: ['/bin/bash', '-c', 'chown -R tempest:tempest /var/log/tempest']
       host_prep_tasks:
-        - name: create persistent directories
+        - name: create persistent logs directory
           file:
-            path: "{{ item.path }}"
+            path: "{{ item }}"
             state: directory
-            setype: "{{ item.setype }}"
           with_items:
-            - { 'path': /var/log/containers/tempest, 'setype': svirt_sandbox_file_t }
-            - { 'path': /var/log/tempest, 'setype': svirt_sandbox_file_t }
-            - { 'path': /var/lib/tempestdata, 'setype': svirt_sandbox_file_t }
-            - { 'path': /var/lib/tempest, 'setype': svirt_sandbox_file_t }
+            - /var/log/containers/tempest
+            - /var/log/tempest
         - name: Tempest logs readme
           copy:
             dest: /var/log/tempest/readme.txt

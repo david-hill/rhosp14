@@ -44,6 +44,11 @@ parameters:
     default: false
     description: Whether to run config management (e.g. Puppet) in debug mode.
     type: boolean
+  PcmkConfigRestartTimeout:
+    default: 600
+    description: Time in seconds to wait for a pcmk resource to restart when
+                 a config change is detected and the resource is being restarted
+    type: number
   DeployIdentifier:
     default: ''
     type: string
@@ -100,12 +105,12 @@ outputs:
       # BEGIN DOCKER SETTINGS
       puppet_config:
         config_volume: rabbitmq
-        puppet_tags: 'file,file_line'
+        puppet_tags: file
         step_config:
           list_join:
             - "\n"
             - - "['Rabbitmq_policy', 'Rabbitmq_user'].each |String $val| { noop_resource($val) }"
-              - "include ::tripleo::profile::pacemaker::rabbitmq_bundle"
+              - get_attr: [RabbitmqBase, role_data, step_config]
         config_image: {get_param: DockerRabbitmqConfigImage}
       kolla_config:
         /var/lib/kolla/config_files/rabbitmq.json:
@@ -115,10 +120,6 @@ outputs:
             source: /dev/null
             owner: root
             perm: '0644'
-          - dest: /var/log/btmp
-            source: /dev/null
-            owner: root:utmp
-            perm: '0600'
           - source: "/var/lib/kolla/config_files/src/*"
             dest: "/"
             merge: true
@@ -202,14 +203,22 @@ outputs:
             detach: false
             net: host
             user: root
-            environment:
-              - TRIPLEO_MINOR_UPDATE
-            command: /pacemaker_restart_bundle.sh rabbitmq-bundle rabbitmq
+            command:
+              - '/usr/bin/bootstrap_host_exec'
+              - 'rabbitmq'
+              - str_replace:
+                  template:
+                    'if /usr/sbin/pcs resource show rabbitmq-bundle; then /usr/sbin/pcs resource restart --wait=PCMKTIMEOUT rabbitmq-bundle; echo "rabbitmq-bundle restart invoked"; fi'
+                  params:
+                    PCMKTIMEOUT: {get_param: PcmkConfigRestartTimeout}
             image: {get_param: DockerRabbitmqImage}
             volumes:
               list_concat:
-                - {get_attr: [ContainersCommon, pacemaker_restart_volumes]}
-                - - /var/lib/config-data/puppet-generated/rabbitmq/:/var/lib/kolla/config_files/src:ro
+                - {get_attr: [ContainersCommon, volumes]}
+                -
+                  - /etc/corosync/corosync.conf:/etc/corosync/corosync.conf:ro
+                  - /dev/shm:/dev/shm:rw
+                  - /var/lib/config-data/puppet-generated/rabbitmq/:/var/lib/kolla/config_files/src:ro
           rabbitmq_init_bundle:
             start_order: 1
             detach: false
@@ -244,13 +253,11 @@ outputs:
       host_prep_tasks:
         - name: create persistent directories
           file:
-            path: "{{ item.path }}"
-            setype: "{{ item.setype }}"
+            path: "{{ item }}"
             state: directory
           with_items:
-            - { 'path': /var/lib/rabbitmq, 'setype': svirt_sandbox_file_t }
-            - { 'path': /var/log/containers/rabbitmq, 'setype': svirt_sandbox_file_t }
-            - { 'path': /var/log/rabbitmq, 'setype': svirt_sandbox_file_t }
+            - /var/lib/rabbitmq
+            - /var/log/containers/rabbitmq
         - name: rabbitmq logs readme
           copy:
             dest: /var/log/rabbitmq/readme.txt

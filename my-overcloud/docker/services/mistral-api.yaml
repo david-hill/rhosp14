@@ -153,14 +153,10 @@ outputs:
             # the Mistral API image so that we get tripleo* actions
             command: "/usr/bin/bootstrap_host_exec mistral_api su mistral -s /bin/bash -c 'mistral-db-manage --config-file /etc/mistral/mistral.conf populate'"
       host_prep_tasks:
-        - name: create persistent directories
+        - name: create persistent logs directory
           file:
-            path: "{{ item.path }}"
+            path: /var/log/containers/mistral
             state: directory
-            setype: "{{ item.setype }}"
-          with_items:
-            - { 'path': /var/log/containers/mistral, 'setype': svirt_sandbox_file_t }
-            - { 'path': /var/log/mistral, 'setype': svirt_sandbox_file_t }
         - name: mistral logs readme
           copy:
             dest: /var/log/mistral/readme.txt
@@ -193,6 +189,17 @@ outputs:
               register: mistral_httpd_enabled_result
             - set_fact:
                 mistral_httpd_enabled: "{{ mistral_httpd_enabled_result.rc == 0 }}"
+            - name: "PreUpgrade step0,validation: Check if openstack-mistral-api is running"
+              command: systemctl is-active --quiet openstack-mistral-api
+              when:
+                - mistral_api_enabled|bool
+              tags: validation
+            - name: "PreUpgrade step0,validation: Check if mistral_api_wsgi is running"
+              shell: systemctl status 'httpd' | grep -q mistral
+              tags: validation
+              when:
+                - mistral_httpd_enabled|bool
+                - httpd_running|bool
         - when: step|int == 2
           block:
             - name: Stop and disable mistral_api service (pre-upgrade not under httpd)
